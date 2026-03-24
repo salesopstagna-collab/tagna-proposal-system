@@ -1,0 +1,290 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "C:\\temp\\tagna-prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GlobalRole {
+  admin
+  sales_engineer
+  commercial
+  field_team
+  finance
+  viewer
+}
+
+enum ProjectStatus {
+  draft
+  in_review
+  approved
+  closed
+}
+
+enum WorkOrderType {
+  automation
+  generic
+}
+
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  password  String
+  role      GlobalRole @default(viewer)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  auditLogs AuditLog[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  hubspotDealId String        @unique
+  projectNumber String        @unique
+  clientName    String
+  description   String?
+  status        ProjectStatus @default(draft)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  memories  CalculationMemory[]
+  auditLogs AuditLog[]
+}
+
+model CalculationMemory {
+  id          String   @id @default(cuid())
+  projectId   String
+  version     Int
+  label       String   @default("v1")
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parameters  ProjectParameters?
+  scopeItems  ScopeItem[]
+  workOrders  WorkOrder[]
+  dre         DRE?
+  supplies    Supply[]
+  milestones  Milestone[]
+
+  @@unique([projectId, version])
+}
+
+model ProjectParameters {
+  id       String @id @default(cuid())
+  memoryId String @unique
+
+  // HH Costs & Prices
+  costHHDev       Float @default(0)
+  costHHField     Float @default(0)
+  priceHHDev      Float @default(0)
+  priceHHField    Float @default(0)
+  priceHHSupport  Float @default(0)
+
+  // Travel
+  airfare         Float @default(0)
+  hotelPerDay     Float @default(0)
+  carRentalPerDay Float @default(0)
+  mealsPerDay     Float @default(0)
+  fuel            Float @default(0)
+  mobilization    Float @default(0)
+
+  // Taxes / deductions (%)
+  issRate         Float @default(0)
+  pisRate         Float @default(0)
+  cofinsRate      Float @default(0)
+  csllRate        Float @default(0)
+  irpjRate        Float @default(0)
+  inssRate        Float @default(0)
+
+  memory CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+}
+
+model ScopeItem {
+  id                  String  @id @default(cuid())
+  memoryId            String
+  order               Int
+  phase               String
+  activity            String
+  detalhamento        String?
+  premissasExclusoes  String?
+  included            Boolean @default(true)
+  notes               String?
+
+  memory         CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  workOrderLines WorkOrderLine[]
+}
+
+model WorkOrder {
+  id       String        @id @default(cuid())
+  memoryId String
+  type     WorkOrderType @default(automation)
+
+  memory CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  lines  WorkOrderLine[]
+}
+
+model ProfessionalRate {
+  id                    String   @id @default(cuid())
+  profile               String   @unique
+  order                 Int      @default(0)
+  salePrice             Float
+  costPrice             Float
+  revenueDeductionPct   Float    @default(13)
+  contributionMarginPct Float    @default(45)
+  travelMarginPct       Float    @default(20)
+  active                Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+
+  workOrderLines WorkOrderLine[]
+}
+
+model TravelRate {
+  id        String   @id @default(cuid())
+  type      String   @unique
+  label     String
+  costPrice Float
+  salePrice Float
+  unit      String   @default("un")
+  notes     String?
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model WorkOrderLine {
+  id                 String   @id @default(cuid())
+  workOrderId        String
+  scopeItemId        String?
+  lineType           String   @default("work")
+  order              Int      @default(0)
+
+  // Work line fields
+  professionalRateId String?
+  quantity           Int      @default(1)
+  totalHours         Float    @default(0)
+  fieldDays          Int      @default(0)
+
+  // Travel line fields (phase "IMPLANTAÇÃO DE CAMPO - REGRAS DE VIAGEM")
+  travelDays         Int      @default(0)
+  travelerCount      Int      @default(1)
+  flightCount        Int      @default(0)
+
+  // Computed totals
+  laborCost          Float    @default(0)
+  laborPrice         Float    @default(0)
+  travelCost         Float    @default(0)
+  travelPrice        Float    @default(0)
+  totalCost          Float    @default(0)
+  totalPrice         Float    @default(0)
+
+  workOrder        WorkOrder         @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  scopeItem        ScopeItem?        @relation(fields: [scopeItemId], references: [id])
+  professionalRate ProfessionalRate? @relation(fields: [professionalRateId], references: [id])
+}
+
+model DRE {
+  id       String @id @default(cuid())
+  memoryId String @unique
+
+  // Revenue
+  grossRevenue      Float @default(0)
+  issDeduction      Float @default(0)
+  pisDeduction      Float @default(0)
+  cofinsDeduction   Float @default(0)
+  totalDeductions   Float @default(0)
+  netRevenue        Float @default(0)
+
+  // Costs
+  costHHDev         Float @default(0)
+  costHHField       Float @default(0)
+  costThirdParty    Float @default(0)
+  costTravel        Float @default(0)
+  costSupplies      Float @default(0)
+  totalDirectCost   Float @default(0)
+
+  // Margins
+  grossMargin       Float @default(0)
+  grossMarginPct    Float @default(0)
+
+  // Expenses
+  expEngineering    Float @default(0)
+  expOperations     Float @default(0)
+  expSales          Float @default(0)
+  expAdmin          Float @default(0)
+  totalExpenses     Float @default(0)
+
+  ebitda            Float @default(0)
+  ebitdaPct         Float @default(0)
+  ebit              Float @default(0)
+  csll              Float @default(0)
+  irpj              Float @default(0)
+  netProfit         Float @default(0)
+  netProfitPct      Float @default(0)
+
+  memory CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+}
+
+model Supply {
+  id          String  @id @default(cuid())
+  memoryId    String
+  category    String
+  description String
+  unit        String  @default("un")
+  quantity    Float   @default(1)
+  unitCost    Float   @default(0)
+  totalCost   Float   @default(0)
+  markup      Float   @default(0)
+  salePrice   Float   @default(0)
+  ncm         String?
+  icms        Float   @default(0)
+  ipi         Float   @default(0)
+  order       Int     @default(0)
+
+  memory CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+}
+
+model Milestone {
+  id           String    @id @default(cuid())
+  memoryId     String
+  name         String
+  description  String?
+  dueDate      DateTime?
+  criteria     String?
+  paymentPct   Float     @default(0)
+  order        Int       @default(0)
+
+  memory CalculationMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  entity    String
+  entityId  String
+  action    String
+  oldValues Json?
+  newValues Json?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+}

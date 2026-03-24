@@ -1,0 +1,53 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tagna
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tagna_secret}
+      POSTGRES_DB: tagna_proposals
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tagna -d tagna_proposals"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://tagna:${DB_PASSWORD:-tagna_secret}@db:5432/tagna_proposals
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-jwt-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-in-production-refresh-secret}
+      PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      HUBSPOT_API_KEY: ${HUBSPOT_API_KEY:-}
+      TEMPLATES_DIR: /app/templates
+    volumes:
+      - ./templates:/app/templates:ro
+    ports:
+      - "3001:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
