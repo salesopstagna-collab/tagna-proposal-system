@@ -37,7 +37,8 @@ async function computeWorkLine(data: z.infer<typeof workLineSchema>) {
 
 async function computeTravelLine(data: z.infer<typeof travelLineSchema>) {
   const travelRates = await prisma.travelRate.findMany({ where: { active: true } });
-  const r = (type: string) => travelRates.find(t => t.type === type);
+  type RateEntry = { type: string; costPrice: number; salePrice: number } | undefined;
+  const r = (type: string): RateEntry => travelRates.find((t: { type: string }) => t.type === type) as RateEntry;
 
   const aeroRate = r('AEREO');
   const hotelRate = r('HOTEL');
@@ -49,8 +50,8 @@ async function computeTravelLine(data: z.infer<typeof travelLineSchema>) {
   const aeroCost = (aeroRate?.costPrice || 0) * data.flightCount;
   const aeroPrice = (aeroRate?.salePrice || 0) * data.flightCount;
 
-  const perPersonPerDay = (n: any) => (n?.costPrice || 0) * data.travelDays * data.travelerCount;
-  const perPersonPerDaySale = (n: any) => (n?.salePrice || 0) * data.travelDays * data.travelerCount;
+  const perPersonPerDay = (n: RateEntry) => (n?.costPrice || 0) * data.travelDays * data.travelerCount;
+  const perPersonPerDaySale = (n: RateEntry) => (n?.salePrice || 0) * data.travelDays * data.travelerCount;
 
   const travelCost = aeroCost + perPersonPerDay(hotelRate) + perPersonPerDay(carroDiaRate) + perPersonPerDay(almocoRate) + perPersonPerDay(jantaRate) + perPersonPerDay(taxiRate);
   const travelPrice = aeroPrice + perPersonPerDaySale(hotelRate) + perPersonPerDaySale(carroDiaRate) + perPersonPerDaySale(almocoRate) + perPersonPerDaySale(jantaRate) + perPersonPerDaySale(taxiRate);

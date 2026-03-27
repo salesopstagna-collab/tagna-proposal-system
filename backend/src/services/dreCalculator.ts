@@ -36,8 +36,8 @@ export async function recalculateDRE(memoryId: string) {
     }
   }
 
-  const totalSuppliesRevenue = memory.supplies.reduce((s, sup) => s + sup.salePrice, 0);
-  const totalSuppliesCost    = memory.supplies.reduce((s, sup) => s + sup.totalCost,  0);
+  const totalSuppliesRevenue = memory.supplies.reduce((s: number, sup: { salePrice: number }) => s + sup.salePrice, 0);
+  const totalSuppliesCost    = memory.supplies.reduce((s: number, sup: { totalCost: number }) => s + sup.totalCost,  0);
 
   // ── Receita Bruta ──────────────────────────────────────────────────────────
   const grossRevenue = totalLaborPrice + totalTravelPrice + totalSuppliesRevenue;
