@@ -12,9 +12,10 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
-RUN mkdir -p templates
+COPY templates ./templates
 
 EXPOSE 3001
 
-CMD sh -c "npx prisma migrate deploy && npx ts-node src/prisma/seed.ts 2>/dev/null || true && node dist/index.js"
+CMD sh -c "npx prisma migrate deploy && node dist/index.js"

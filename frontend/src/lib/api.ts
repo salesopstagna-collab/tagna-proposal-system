@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-export const api = axios.create({ baseURL: '/api' });
+const BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+export const api = axios.create({ baseURL: BASE_URL });
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
@@ -18,7 +19,7 @@ api.interceptors.response.use(
       const { refreshToken, setAccessToken, logout } = useAuthStore.getState();
       if (!refreshToken) { logout(); return Promise.reject(error); }
       try {
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
         setAccessToken(data.accessToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(original);

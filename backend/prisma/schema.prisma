@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "C:\\temp\\tagna-prisma-client"
 }
 
 datasource db {
